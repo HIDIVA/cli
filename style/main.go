@@ -7,6 +7,7 @@ import (
 	"go/token"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 )
 
@@ -28,8 +29,6 @@ type visitor struct {
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch typedNode := node.(type) {
 	case *ast.File:
-		return v
-	case *ast.Package:
 		return v
 	case *ast.GenDecl:
 		if typedNode.Tok == token.CONST {
@@ -114,11 +113,9 @@ func shouldParseFile(info os.FileInfo) bool {
 }
 
 func main() {
-	fileSet := token.NewFileSet()
+	var allWarnings []warning
 
-	v := visitor{
-		fileSet: fileSet,
-	}
+	fileSet := token.NewFileSet()
 
 	err := filepath.Walk(os.Args[1], func(path string, info os.FileInfo, err error) error {
 		if !info.IsDir() {
@@ -135,9 +132,26 @@ func main() {
 			return err
 		}
 
-		for _, packag := range packages {
-			// fmt.Println(ast.Print(fileSet, packag))
-			ast.Walk(&v, packag)
+		var packageNames []string
+		for packageName, _ := range packages {
+			packageNames = append(packageNames, packageName)
+		}
+		sort.Strings(packageNames)
+
+		for _, packageName := range packageNames {
+			var fileNames []string
+			for fileName, _ := range packages[packageName].Files {
+				fileNames = append(fileNames, fileName)
+			}
+			sort.Strings(fileNames)
+
+			for _, fileName := range fileNames {
+				v := visitor{
+					fileSet: fileSet,
+				}
+				ast.Walk(&v, packages[packageName].Files[fileName])
+				allWarnings = append(allWarnings, v.warnings...)
+			}
 		}
 
 		return nil
@@ -147,11 +161,11 @@ func main() {
 		panic(err)
 	}
 
-	for _, warning := range v.warnings {
+	for _, warning := range allWarnings {
 		fmt.Printf("%s:%d %s\n", warning.Position.Filename, warning.Position.Line, warning.message)
 	}
 
-	if len(v.warnings) > 0 {
+	if len(allWarnings) > 0 {
 		os.Exit(1)
 	}
 }
