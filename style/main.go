@@ -6,6 +6,8 @@ import (
 	"go/parser"
 	"go/token"
 	"os"
+	"path/filepath"
+	"strings"
 )
 
 type warning struct {
@@ -26,6 +28,8 @@ type visitor struct {
 func (v *visitor) Visit(node ast.Node) ast.Visitor {
 	switch typedNode := node.(type) {
 	case *ast.File:
+		return v
+	case *ast.Package:
 		return v
 	case *ast.GenDecl:
 		if typedNode.Tok == token.CONST {
@@ -105,20 +109,43 @@ func (v *visitor) addWarning(message string, pos token.Pos) {
 	})
 }
 
+func shouldParseFile(info os.FileInfo) bool {
+	return !strings.HasSuffix(info.Name(), "_test.go")
+}
+
 func main() {
 	fileSet := token.NewFileSet()
-	f, err := parser.ParseFile(fileSet, os.Args[1], nil, 0)
-	if err != nil {
-		panic(err)
-	}
 
 	v := visitor{
 		fileSet: fileSet,
 	}
 
-	ast.Walk(&v, f)
+	err := filepath.Walk(os.Args[1], func(path string, info os.FileInfo, err error) error {
+		if !info.IsDir() {
+			return nil
+		}
 
-	// fmt.Println(ast.Print(fileSet, f))
+		base := filepath.Base(path)
+		if base == "vendor" || base == ".git" || strings.HasSuffix(base, "fakes") {
+			return filepath.SkipDir
+		}
+
+		packages, err := parser.ParseDir(fileSet, path, shouldParseFile, 0)
+		if err != nil {
+			return err
+		}
+
+		for _, packag := range packages {
+			// fmt.Println(ast.Print(fileSet, packag))
+			ast.Walk(&v, packag)
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		panic(err)
+	}
 
 	for _, warning := range v.warnings {
 		fmt.Printf("%s:%d %s\n", warning.Position.Filename, warning.Position.Line, warning.message)
