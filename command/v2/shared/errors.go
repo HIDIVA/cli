@@ -3,6 +3,8 @@ package shared
 import (
 	"fmt"
 	"time"
+
+	"code.cloudfoundry.org/cli/util/ui"
 )
 
 type JobFailedError struct {
@@ -186,4 +188,36 @@ func (e StartupTimeoutError) Translate(translate func(string, ...interface{}) st
 		"AppName":    e.AppName,
 		"BinaryName": e.BinaryName,
 	})
+}
+
+type UploadFailedError struct {
+	Err error
+}
+
+func (_ UploadFailedError) Error() string {
+	return "Uploading files have failed after a number of retriest due to: {{.Error}}"
+}
+
+func (e UploadFailedError) Translate(translate func(string, ...interface{}) string) string {
+	var message string
+	if err, ok := e.Err.(ui.TranslatableError); ok {
+		message = err.Translate(translate)
+	} else {
+		message = e.Err.Error()
+	}
+
+	return translate(e.Error(), map[string]interface{}{
+		"Error": message,
+	})
+}
+
+type NoDomainsFoundError struct {
+}
+
+func (_ NoDomainsFoundError) Error() string {
+	return fmt.Sprintf("No private or shared domains found in this organization")
+}
+
+func (e NoDomainsFoundError) Translate(translate func(string, ...interface{}) string) string {
+	return translate(e.Error())
 }

@@ -37,13 +37,15 @@ var _ = Describe("Translatable Errors", func() {
 		},
 
 		// Actor errors.
+		Entry("HTTPHealthCheckInvalidError", HTTPHealthCheckInvalidError{}),
 		Entry("JobFailedError", JobFailedError{}),
 		Entry("JobTimeoutError", JobTimeoutError{}),
-		Entry("HTTPHealthCheckInvalidError", HTTPHealthCheckInvalidError{}),
+		Entry("NoDomainsFoundError", NoDomainsFoundError{}),
 		Entry("StagingFailedError", StagingFailedError{}),
 		Entry("StagingFailedNoAppDetectedError", StagingFailedNoAppDetectedError{}),
 		Entry("StagingTimeoutError", StagingTimeoutError{}),
 		Entry("StartupTimeoutError", StartupTimeoutError{}),
+		Entry("UploadFailedError", UploadFailedError{Err: JobFailedError{}}),
 
 		// Command errors.
 		Entry("NoOrgTargetedError", NoOrganizationTargetedError{}),
